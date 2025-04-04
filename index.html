@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Learnmore AI Education Style</title>
+  <style>
+    /* Overall page styling using a monospaced (ASCII) font */
+    body {
+      margin: 0;
+      font-family: "Courier New", Courier, monospace;
+      background-color: #ffffff;
+      color: #333;
+      text-align: center;
+    }
+    /* Navigation bar styling */
+    .navbar {
+      background-color: #000;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .navbar ul {
+      list-style: none;
+      display: flex;
+      padding: 0;
+      margin: 0;
+    }
+    .navbar li {
+      margin: 0 25px;
+    }
+    .navbar a {
+      text-decoration: none;
+      color: #fff;
+      font-size: 18px;
+    }
+    .navbar a:hover {
+      text-decoration: underline;
+    }
+    /* ASCII art container styling */
+    #ascii-art {
+      margin: 50px auto;
+      padding: 20px;
+      border: 1px solid #B3B3B3; /* 70% gray border */
+      display: inline-block;
+      white-space: pre;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation bar with clickable menu items -->
+  <div class="navbar">
+    <ul>
+      <li><a href="index.html">Index</a></li>
+      <li><a href="HandPose.html">HandPose</a></li>
+      <li><a href="BodyPose.html">BodyPose</a></li>
+      <li><a href="FaceMesh.html">FaceMesh</a></li>
+    </ul>
+  </div>
+  
+  <!-- Creative ASCII artwork with interactive glitch effect -->
+  <div id="ascii-art">
+### Learnmore AI Education Stlye ###
+  </div>
+
+  <script>
+    // JavaScript for interactive ASCII art glitch effect and hyperlink on click
+    const asciiArtElement = document.getElementById("ascii-art");
+    const originalText = asciiArtElement.textContent;
+    let glitchInterval;
+    
+    // When mouse hovers over the ASCII art, start glitch effect
+    asciiArtElement.addEventListener("mouseenter", function() {
+      glitchInterval = setInterval(() => {
+        let newText = "";
+        for (let i = 0; i < originalText.length; i++) {
+          // Preserve spaces and newlines
+          if (originalText[i] === " " || originalText[i] === "\n") {
+            newText += originalText[i];
+          } else {
+            // 50% chance to change the character to a random ASCII symbol
+            newText += (Math.random() < 0.5) 
+              ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) 
+              : originalText[i];
+          }
+        }
+        asciiArtElement.textContent = newText;
+      }, 50);
+    });
+    
+    // When the mouse leaves, stop glitch effect and reset the text
+    asciiArtElement.addEventListener("mouseleave", function() {
+      clearInterval(glitchInterval);
+      asciiArtElement.textContent = originalText;
+    });
+    
+    // On click, navigate to www.learnmore.co.kr
+    asciiArtElement.addEventListener("click", function() {
+      window.location.href = "https://www.learnmore.co.kr";
+    });
+  </script>
+</body>
+</html>

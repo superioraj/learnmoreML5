@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BodyPose Control Example</title>
+  <!-- Load p5.js and ml5.js libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+  <style>
+    /* Overall page styling using a monospaced (ASCII) font */
+    body {
+      margin: 0;
+      font-family: "Courier New", Courier, monospace;
+      background-color: #ffffff;
+      color: #333;
+      text-align: center;
+    }
+    /* Navigation bar (Gates Notes style) */
+    .navbar {
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 20px;
+      height: 60px;
+    }
+    .navbar ul {
+      list-style: none;
+      display: flex;
+      margin: 0;
+      padding: 0;
+    }
+    .navbar li {
+      margin: 0 25px;
+    }
+    .menu-item {
+      text-decoration: none;
+      font-size: 18px;
+      color: #ccc;  /* Inactive link */
+      transition: color 0.3s ease;
+    }
+    .menu-item.active {
+      color: #fff;  /* Active link */
+    }
+    .menu-item:hover {
+      color: #eee;
+    }
+    /* Typewriter effect container (optional) */
+    .typewriter-container {
+      margin: 40px auto 20px auto;
+      max-width: 700px;
+      border: 1px dotted #B3B3B3;
+      padding: 20px;
+      position: relative;
+      white-space: pre;
+      overflow: hidden;
+    }
+    .typewriter-container::after {
+      content: '|';
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      font-weight: bold;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    /* Table styling: horizontal borders only */
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+      font-size: 15px;
+      width: 70%;
+      max-width: 600px;
+    }
+    th, td {
+      border-top: 1px solid #B3B3B3;
+      border-bottom: 1px solid #B3B3B3;
+      padding: 10px;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    /* Serial connection button */
+    #connect {
+      margin: 15px;
+      padding: 8px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      border: 1px solid #B3B3B3;
+      background-color: #fff;
+    }
+    /* p5.js canvas container */
+    #p5-canvas-container {
+      margin: 0 auto 30px auto;
+      width: 640px;
+      position: relative;
+      border: 1px solid #B3B3B3;
+    }
+    /* Gesture text label */
+    .gesture-label {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      color: red;
+      font-size: 24px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation bar with menu items -->
+  <div class="navbar">
+    <ul>
+      <li><a href="index.html" class="menu-item">Index</a></li>
+      <li><a href="HandPose.html" class="menu-item">HandPose</a></li>
+      <li><a href="BodyPose.html" class="menu-item active">BodyPose</a></li>
+      <li><a href="FaceMesh.html" class="menu-item">FaceMesh</a></li>
+    </ul>
+  </div>
+
+  <!-- Optional ASCII Typewriter effect container -->
+  <div id="typewriter" class="typewriter-container"></div>
+
+  <!-- Updated Gesture Mapping Table for BodyPose -->
+  <table>
+    <thead>
+      <tr>
+        <th>Body Pose</th>
+        <th>Transmission Character</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Standing</td>
+        <td>1</td>
+      </tr>
+      <tr>
+        <td>Sitting</td>
+        <td>2</td>
+      </tr>
+      <tr>
+        <td>Celebration (Manse)</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>Arms Spread</td>
+        <td>4</td>
+      </tr>
+      <tr>
+        <td>Right Arm Moving</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>Left Arm Moving</td>
+        <td>6</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Serial connection button -->
+  <button id="connect">Connect Serial</button>
+
+  <!-- p5.js canvas container -->
+  <div id="p5-canvas-container"></div>
+
+  <script>
+    /************************************************************
+     * 1) ASCII Typewriter Effect (Looping) - (Optional)
+     ************************************************************/
+    const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
+    const typeSpeed = 50;
+    const loopDelay = 2000;
+    function startTypewriter() {
+      const container = document.getElementById("typewriter");
+      let idx = 0;
+      function typeChar() {
+        if (idx < asciiArtText.length) {
+          container.textContent += asciiArtText.charAt(idx);
+          idx++;
+          setTimeout(typeChar, typeSpeed);
+        } else {
+          setTimeout(() => {
+            container.textContent = "";
+            idx = 0;
+            typeChar();
+          }, loopDelay);
+        }
+      }
+      typeChar();
+    }
+    document.addEventListener("DOMContentLoaded", startTypewriter);
+
+    /************************************************************
+     * 2) BodyPose (PoseNet) + Web Serial API for micro:bit Control
+     ************************************************************/
+    let video, poseNet;
+    let pose = null;
+    let prevRightWrist = null;
+    let prevLeftWrist = null;
+    let port, writer;
+    let currentGesture = "";
+
+    function setup() {
+      let cnv = createCanvas(640, 480);
+      cnv.parent('p5-canvas-container');
+      video = createCapture(VIDEO);
+      video.size(width, height);
+      video.hide();
+
+      // Initialize PoseNet (BodyPose) model
+      poseNet = ml5.poseNet(video, modelReady);
+      poseNet.on('pose', results => {
+        if (results.length > 0) {
+          pose = results[0].pose;
+        }
+      });
+
+      // Serial port connection
+      document.getElementById("connect").addEventListener("click", async () => {
+        try {
+          port = await navigator.serial.requestPort();
+          await port.open({ baudRate: 9600 });
+          writer = port.writable.getWriter();
+          console.log("Serial Port Connected");
+        } catch (error) {
+          console.error("Serial Port Connection Error:", error);
+        }
+      });
+    }
+
+    function modelReady() {
+      console.log("PoseNet Model Loaded");
+    }
+
+    function draw() {
+      image(video, 0, 0, width, height);
+
+      if (pose) {
+        let gesture = detectGesture(pose);
+        fill(255, 0, 0);
+        textSize(32);
+        text("Gesture: " + gesture, 10, height - 10);
+
+        if (gesture && gesture !== currentGesture) {
+          currentGesture = gesture;
+          sendSerial(gesture);
+        }
+      }
+
+      // Update previous wrist positions for movement detection
+      if (pose) {
+        prevRightWrist = getPart(pose, "rightWrist");
+        prevLeftWrist = getPart(pose, "leftWrist");
+      }
+    }
+
+    // Helper: get position of a specific body part from pose keypoints
+    function getPart(pose, part) {
+      let kp = pose.keypoints.find(k => k.part === part);
+      return kp ? kp.position : null;
+    }
+
+    // Calculate Euclidean distance between two points
+    function distance(p1, p2) {
+      return dist(p1.x, p1.y, p2.x, p2.y);
+    }
+
+    // Detect gesture based on the current body pose
+    function detectGesture(pose) {
+      // Extract relevant keypoint positions
+      const nose = getPart(pose, "nose");
+      const leftWrist = getPart(pose, "leftWrist");
+      const rightWrist = getPart(pose, "rightWrist");
+      const leftShoulder = getPart(pose, "leftShoulder");
+      const rightShoulder = getPart(pose, "rightShoulder");
+      const leftHip = getPart(pose, "leftHip");
+      const rightHip = getPart(pose, "rightHip");
+      const leftKnee = getPart(pose, "leftKnee");
+      const rightKnee = getPart(pose, "rightKnee");
+      const leftAnkle = getPart(pose, "leftAnkle");
+      const rightAnkle = getPart(pose, "rightAnkle");
+
+      // 1. Celebration (Manse): both wrists above nose
+      if (leftWrist && rightWrist && nose) {
+        if (leftWrist.y < nose.y && rightWrist.y < nose.y) {
+          return "3";
+        }
+      }
+
+      // 2. Arms Spread: both wrists far left/right of shoulders
+      if (leftWrist && rightWrist && leftShoulder && rightShoulder) {
+        if (leftWrist.x < leftShoulder.x - 20 && rightWrist.x > rightShoulder.x + 20) {
+          return "4";
+        }
+      }
+
+      // 3. Arm Moving: check movement of right or left wrist relative to previous positions
+      const movementThreshold = 20;
+      let rightDelta = 0, leftDelta = 0;
+      if (prevRightWrist && rightWrist) {
+        rightDelta = distance(rightWrist, prevRightWrist);
+      }
+      if (prevLeftWrist && leftWrist) {
+        leftDelta = distance(leftWrist, prevLeftWrist);
+      }
+      if (rightDelta > movementThreshold || leftDelta > movementThreshold) {
+        if (rightDelta >= leftDelta && rightDelta > movementThreshold) return "5";
+        if (leftDelta > rightDelta && leftDelta > movementThreshold) return "6";
+      }
+
+      // 4. Standing vs Sitting: compare average hip and ankle positions
+      if (leftHip && rightHip && leftAnkle && rightAnkle) {
+        let avgHipY = (leftHip.y + rightHip.y) / 2;
+        let avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
+        if ((avgAnkleY - avgHipY) > 150) return "1"; // Standing
+        else return "2"; // Sitting
+      }
+
+      return "";
+    }
+
+    // Send the command to micro:bit via serial communication
+    async function sendSerial(command) {
+      if (writer) {
+        try {
+          const data = new TextEncoder().encode(command);
+          await writer.write(data);
+          console.log("Command Sent: " + command);
+        } catch (error) {
+          console.error("Serial Send Error:", error);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

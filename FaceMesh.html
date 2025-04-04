@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaceMesh Control Example</title>
+  <!-- Load p5.js and ml5.js libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+  <style>
+    /* Overall page styling using a monospaced (ASCII) font */
+    body {
+      margin: 0;
+      font-family: "Courier New", Courier, monospace;
+      background-color: #ffffff;
+      color: #333;
+      text-align: center;
+    }
+    /* Navigation bar with Gates Notes style */
+    .navbar {
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 20px;
+      height: 60px;
+    }
+    .navbar ul {
+      list-style: none;
+      display: flex;
+      margin: 0;
+      padding: 0;
+    }
+    .navbar li {
+      margin: 0 25px;
+    }
+    .menu-item {
+      text-decoration: none;
+      font-size: 18px;
+      color: #ccc; /* inactive */
+      transition: color 0.3s ease;
+    }
+    .menu-item.active {
+      color: #fff; /* active */
+    }
+    .menu-item:hover {
+      color: #eee;
+    }
+    /* Optional typewriter effect container */
+    .typewriter-container {
+      margin: 40px auto 20px auto;
+      max-width: 700px;
+      border: 1px dotted #B3B3B3;
+      padding: 20px;
+      position: relative;
+      white-space: pre;
+      overflow: hidden;
+    }
+    .typewriter-container::after {
+      content: '|';
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      font-weight: bold;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    /* p5.js canvas container */
+    #p5-canvas-container {
+      margin: 0 auto 30px auto;
+      width: 640px;
+      position: relative;
+      border: 1px solid #B3B3B3;
+    }
+    /* FaceMesh data display with ASCII glitch effect */
+    #faceData {
+      margin: 20px auto;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #B3B3B3;
+      display: inline-block;
+      white-space: pre;
+    }
+    /* Serial connection button */
+    #connect {
+      margin: 15px;
+      padding: 8px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      border: 1px solid #B3B3B3;
+      background-color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation bar -->
+  <div class="navbar">
+    <ul>
+      <li><a href="index.html" class="menu-item">Index</a></li>
+      <li><a href="HandPose.html" class="menu-item">HandPose</a></li>
+      <li><a href="BodyPose.html" class="menu-item">BodyPose</a></li>
+      <li><a href="FaceMesh.html" class="menu-item active">FaceMesh</a></li>
+    </ul>
+  </div>
+  
+  <!-- Optional typewriter container -->
+  <div id="typewriter" class="typewriter-container"></div>
+  
+  <!-- p5.js canvas container (camera feed appears immediately) -->
+  <div id="p5-canvas-container"></div>
+  
+  <!-- FaceMesh data display -->
+  <div id="faceData">Face Data: N/A</div>
+  
+  <!-- Serial connection button -->
+  <button id="connect">Connect Serial</button>
+  
+  <script>
+    /*******************************************************
+     * 1) ASCII Typewriter Effect (Optional)
+     *******************************************************/
+    const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
+    const typeSpeed = 50; // 50ms per character
+    const loopDelay = 2000; // 2 seconds delay before repeating
+    function startTypewriter() {
+      const container = document.getElementById("typewriter");
+      let idx = 0;
+      function typeChar() {
+        if (idx < asciiArtText.length) {
+          container.textContent += asciiArtText.charAt(idx);
+          idx++;
+          setTimeout(typeChar, typeSpeed);
+        } else {
+          setTimeout(() => { container.textContent = ""; idx = 0; typeChar(); }, loopDelay);
+        }
+      }
+      typeChar();
+    }
+    document.addEventListener("DOMContentLoaded", () => { startTypewriter(); });
+    
+    /*******************************************************
+     * 2) FaceMesh + Web Serial API for micro:bit Control
+     *******************************************************/
+    let video, facemesh, predictions = [];
+    let port, writer;
+    let prevX = 0, prevY = 0, prevMouth = 0;
+    
+    function setup() {
+      // Initialize p5 canvas and immediately start camera capture,
+      // so that the camera feed is visible even if serial is not connected.
+      let cnv = createCanvas(640, 480);
+      cnv.parent('p5-canvas-container');
+      
+      // Create and display camera capture (mirror effect applied in draw())
+      video = createCapture(VIDEO);
+      video.size(width, height);
+      video.hide();
+      
+      // Initialize FaceMesh model
+      facemesh = ml5.facemesh(video, modelReady);
+      facemesh.on('predict', results => { predictions = results; });
+      
+      // Serial connection (optional) activated via button click
+      document.getElementById("connect").addEventListener("click", async () => {
+        try {
+          port = await navigator.serial.requestPort();
+          await port.open({ baudRate: 9600 });
+          writer = port.writable.getWriter();
+          console.log("Serial Port Connected");
+        } catch (error) {
+          console.error("Serial Port Connection Error:", error);
+        }
+      });
+    }
+    
+    function modelReady() {
+      console.log("FaceMesh Model Loaded");
+    }
+    
+    function draw() {
+      // Draw flipped video for mirror effect
+      push();
+      translate(width, 0);
+      scale(-1, 1);
+      image(video, 0, 0, width, height);
+      pop();
+      
+      // Draw center crosshair (gray 60%: #999999)
+      stroke('#999999');
+      strokeWeight(2);
+      line(width/2 - 25, height/2, width/2 + 25, height/2);
+      line(width/2, height/2 - 25, width/2, height/2 + 25);
+      
+      if (predictions.length > 0) {
+        let face = predictions[0].scaledMesh;
+        // Compute bounding box for horizontal mapping
+        let xs = face.map(p => p[0]);
+        let minX = Math.min(...xs), maxX = Math.max(...xs);
+        
+        // Using landmarks: forehead (index 10), chin (index 152), and nose tip (index 4)
+        let forehead = face[10];
+        let chin = face[152];
+        let nose = face[4];
+        let faceHeight = chin[1] - forehead[1];
+        // Vertical: if nose is near forehead => looking up → high value.
+        let verticalRatio = (nose[1] - forehead[1]) / faceHeight;
+        let yValue = Math.round((1 - verticalRatio) * 100);
+        yValue = constrain(yValue, 1, 100);
+        
+        // Horizontal: using flipped x-coordinate from bounding box (nose position)
+        let horizontalRatio = (maxX - nose[0]) / (maxX - minX);
+        let xValue = Math.round(horizontalRatio * 100);
+        xValue = constrain(xValue, 1, 100);
+        
+        // Mouth: distance between inner lip landmarks (indices 13 and 14)
+        let mouthUpper = face[13];
+        let mouthLower = face[14];
+        let mouthDist = dist(mouthUpper[0], mouthUpper[1], mouthLower[0], mouthLower[1]);
+        // Normalize by face height and scale empirically
+        let mouthValue = Math.round((mouthDist / faceHeight) * 300);
+        mouthValue = constrain(mouthValue, 1, 100);
+        
+        // Update Face Data display with ASCII glitch effect if values change
+        let faceDataDiv = document.getElementById("faceData");
+        if (xValue !== prevX || yValue !== prevY || mouthValue !== prevMouth) {
+          let glitchText = generateGlitchText(xValue, yValue, mouthValue);
+          faceDataDiv.textContent = glitchText;
+          prevX = xValue; prevY = yValue; prevMouth = mouthValue;
+          // Serial data in format "X:<xValue>;Y:<yValue>;M:<mouthValue>"
+          let command = "X:" + xValue + ";Y:" + yValue + ";M:" + mouthValue;
+          sendSerial(command);
+        }
+        
+        // Optionally, draw face landmarks (for debugging)
+        for (let i = 0; i < face.length; i++) {
+          let [x, y] = face[i];
+          fill(0, 255, 0);
+          noStroke();
+          ellipse(width - x, y, 4, 4);
+        }
+      }
+    }
+    
+    function generateGlitchText(xVal, yVal, mouthVal) {
+      let asciiChars = "!@#$%^&*()-_=+[]{};:'\",.<>/?\\|";
+      function glitchNumber(num) {
+        let str = num.toString();
+        let glitched = "";
+        for (let i = 0; i < str.length; i++) {
+          glitched += (Math.random() < 0.5)
+            ? asciiChars.charAt(Math.floor(Math.random() * asciiChars.length))
+            : str.charAt(i);
+        }
+        return glitched;
+      }
+      return "X:" + glitchNumber(xVal) + "  Y:" + glitchNumber(yVal) + "\nMOUTH:" + glitchNumber(mouthVal);
+    }
+    
+    async function sendSerial(command) {
+      if (writer) {
+        try {
+          const data = new TextEncoder().encode(command);
+          await writer.write(data);
+          console.log("Command Sent: " + command);
+        } catch (error) {
+          console.error("Serial Send Error:", error);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
