@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>HandPose Control Example</title>
-  <!-- Load p5.js and ml5.js libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+  <!-- p5.js와 ml5.js 라이브러리를 jsDelivr CDN을 통해 불러옵니다. -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
   <style>
-    /* Overall page styling using a monospaced (ASCII) font */
+    /* 전체 페이지 스타일: 모노스페이스 폰트 사용 */
     body {
       margin: 0;
       font-family: "Courier New", Courier, monospace;
@@ -15,7 +15,7 @@
       color: #333;
       text-align: center;
     }
-    /* Navigation bar with Gates Notes style: black background, centered menu */
+    /* 네비게이션 바 (Gates Notes 스타일) */
     .navbar {
       background-color: #000;
       display: flex;
@@ -33,20 +33,19 @@
     .navbar li {
       margin: 0 25px;
     }
-    /* Menu link styling: text-based color changes only */
     .menu-item {
       text-decoration: none;
       font-size: 18px;
-      color: #ccc; /* Inactive link color */
+      color: #ccc;
       transition: color 0.3s ease;
     }
     .menu-item.active {
-      color: #fff; /* Active link color */
+      color: #fff;
     }
     .menu-item:hover {
-      color: #eee; /* Hover effect color */
+      color: #eee;
     }
-    /* Optional ASCII Typewriter effect container */
+    /* ASCII 타자기 효과 컨테이너 (상단) */
     .typewriter-container {
       margin: 40px auto 20px auto;
       max-width: 700px;
@@ -69,7 +68,7 @@
       50% { opacity: 0; }
       100% { opacity: 1; }
     }
-    /* Table styling: horizontal borders only */
+    /* 테이블 스타일: 수평 테두리만 사용 */
     table {
       margin: 20px auto;
       border-collapse: collapse;
@@ -85,35 +84,35 @@
     th {
       background-color: #f2f2f2;
     }
-    /* Serial connection button */
-    #connect {
-      margin: 15px;
+    /* 버튼 스타일 */
+    #connect, #cameraOn, #cameraOff {
+      margin: 15px 5px;
       padding: 8px 16px;
       font-size: 16px;
       cursor: pointer;
       border: 1px solid #B3B3B3;
       background-color: #fff;
     }
-    /* p5.js canvas container */
+    /* p5.js 캔버스 컨테이너 */
     #p5-canvas-container {
       margin: 0 auto 30px auto;
       width: 640px;
       position: relative;
       border: 1px solid #B3B3B3;
     }
-    /* Gesture text label */
-    .gesture-label {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      color: red;
-      font-size: 24px;
-      pointer-events: none;
+    /* 제스처 결과 표시용 ASCII 컨테이너 (하단) */
+    #gestureAscii {
+      margin: 20px auto;
+      max-width: 300px;
+      border: 1px dotted #B3B3B3;
+      padding: 20px;
+      white-space: pre;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <!-- Navigation bar -->
+  <!-- 네비게이션 바 -->
   <div class="navbar">
     <ul>
       <li><a href="index.html" class="menu-item">Index</a></li>
@@ -123,10 +122,10 @@
     </ul>
   </div>
 
-  <!-- Optional ASCII Typewriter effect container -->
+  <!-- 상단 ASCII 타자기 효과 컨테이너 -->
   <div id="typewriter" class="typewriter-container"></div>
 
-  <!-- Gesture Mapping Table -->
+  <!-- 제스처 매핑 테이블 -->
   <table>
     <thead>
       <tr>
@@ -136,11 +135,11 @@
     </thead>
     <tbody>
       <tr>
-        <td>Right index finger pointing left</td>
+        <td>Right index finger pointing right</td>
         <td>1</td>
       </tr>
       <tr>
-        <td>Right index finger pointing right</td>
+        <td>Right index finger pointing left</td>
         <td>2</td>
       </tr>
       <tr>
@@ -155,166 +154,215 @@
         <td>Right hand open</td>
         <td>5</td>
       </tr>
-      <tr>
-        <td>Right hand in fist</td>
-        <td>6</td>
-      </tr>
     </tbody>
   </table>
 
-  <!-- Serial connection button -->
+  <!-- 시리얼 및 카메라 제어 버튼 -->
   <button id="connect">Connect Serial</button>
+  <button id="cameraOn">Camera On</button>
+  <button id="cameraOff">Camera Off</button>
 
-  <!-- p5.js canvas container -->
+  <!-- p5.js 캔버스 컨테이너 -->
   <div id="p5-canvas-container"></div>
+  
+  <!-- 하단 제스처 결과를 표시할 ASCII 컨테이너 -->
+  <div id="gestureAscii"></div>
 
+  <!-- 스크립트: DOMContentLoaded 이후 실행 -->
   <script>
-    /************************************************************
-     * 1) ASCII Typewriter Effect (Looping) - (Optional)
-     ************************************************************/
-    const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
-    const typeSpeed = 50;   // 50ms per character
-    const loopDelay = 2000; // 2 seconds delay before repeating
+    document.addEventListener("DOMContentLoaded", function() {
 
-    function startTypewriter() {
-      const container = document.getElementById("typewriter");
-      let idx = 0;
-      function typeChar() {
-        if (idx < asciiArtText.length) {
-          container.textContent += asciiArtText.charAt(idx);
-          idx++;
-          setTimeout(typeChar, typeSpeed);
+      /************************************************************
+       * 1) 상단 ASCII 타자기 효과 (루핑)
+       ************************************************************/
+      const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
+      const typeSpeed = 50;   // 문자당 50ms
+      const loopDelay = 2000; // 반복 전 2초 지연
+
+      function startTypewriter() {
+        const container = document.getElementById("typewriter");
+        let idx = 0;
+        function typeChar() {
+          if (idx < asciiArtText.length) {
+            container.textContent += asciiArtText.charAt(idx);
+            idx++;
+            setTimeout(typeChar, typeSpeed);
+          } else {
+            setTimeout(() => {
+              container.textContent = "";
+              idx = 0;
+              typeChar();
+            }, loopDelay);
+          }
+        }
+        typeChar();
+      }
+      startTypewriter();
+
+      /************************************************************
+       * 2) Handpose + Web Serial API를 이용한 micro:bit 제어
+       ************************************************************/
+      let video, handpose, predictions = [];
+      let port, writer;
+      let currentGesture = "";
+      let cameraActive = true;
+
+      // p5.js setup 함수: 전역(window)에 등록하여 p5 라이브러리에서 인식하도록 함.
+      window.setup = function() {
+        let cnv = createCanvas(640, 480);
+        cnv.parent('p5-canvas-container');
+
+        // 카메라 캡처 초기화 (원본 그대로 캡처: 반전 없음)
+        video = createCapture(VIDEO, () => {
+          console.log("Camera capture initialized.");
+        });
+        video.size(width, height);
+        video.elt.setAttribute('playsinline', '');
+        video.elt.muted = true;
+        video.elt.autoplay = true;
+        video.hide();
+
+        // Handpose 모델 초기화
+        handpose = ml5.handpose(video, () => {
+          console.log("Handpose Model Loaded");
+        });
+        handpose.on("predict", results => {
+          predictions = results;
+        });
+
+        // 시리얼 연결 버튼 이벤트
+        document.getElementById("connect").addEventListener("click", async () => {
+          try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 9600 });
+            writer = port.writable.getWriter();
+            console.log("Serial Port Connected");
+          } catch (error) {
+            console.error("Serial Port Connection Error:", error);
+          }
+        });
+
+        // Camera On 버튼: 카메라가 꺼져 있을 때 재초기화
+        document.getElementById("cameraOn").addEventListener("click", () => {
+          if (!cameraActive) {
+            if (video) { video.remove(); }
+            window.setup();  // 카메라와 모델 재초기화
+            cameraActive = true;
+            console.log("Camera turned ON");
+          }
+        });
+
+        // Camera Off 버튼: 비디오 스트림 정지
+        document.getElementById("cameraOff").addEventListener("click", () => {
+          if (cameraActive && video && video.elt && video.elt.srcObject) {
+            video.elt.srcObject.getTracks().forEach(track => track.stop());
+            cameraActive = false;
+            console.log("Camera turned OFF");
+          }
+        });
+      };
+
+      // p5.js draw 함수: 전역(window)에 등록
+      window.draw = function() {
+        background(220);
+
+        if (cameraActive && video) {
+          /********************************************
+           * (1) 실제로 화면에 그릴 때만 좌우 반전 적용
+           ********************************************/
+          push();
+          // 좌측 상단 원점 → 우측 상단으로 평행이동 후 scale(-1,1)
+          translate(width, 0);
+          scale(-1, 1);
+          // 반전된 상태로 비디오 이미지를 그리고,
+          image(video, 0, 0, width, height);
+
+          // 동일한 변환 공간에서 landmarks도 그대로 그려주면
+          // 반전이 일관성 있게 적용되어 정확히 손끝에 표시됨
+          if (predictions.length > 0) {
+            let hand = predictions[0].landmarks;
+            drawKeypoints(hand);
+          }
+          pop();
         } else {
-          setTimeout(() => {
-            container.textContent = "";
-            idx = 0;
-            typeChar();
-          }, loopDelay);
-        }
-      }
-      typeChar();
-    }
-    document.addEventListener("DOMContentLoaded", startTypewriter);
-
-    /************************************************************
-     * 2) Handpose + Web Serial API for micro:bit Control
-     ************************************************************/
-    let video, handpose, predictions = [];
-    let port, writer;
-    let currentGesture = "";
-
-    function setup() {
-      // Create p5 canvas and attach to container
-      let cnv = createCanvas(640, 480);
-      cnv.parent('p5-canvas-container');
-
-      // Initialize camera capture
-      video = createCapture(VIDEO, () => {
-        console.log("Camera capture initialized.");
-      });
-      video.size(width, height);
-      video.hide();  // Hide HTML video element, we will draw it on canvas
-
-      // Initialize Handpose model
-      handpose = ml5.handpose(video, () => {
-        console.log("Handpose Model Loaded");
-      });
-
-      // Receive predictions from the model
-      handpose.on("predict", results => {
-        predictions = results;
-      });
-
-      // Setup Serial connect button (optional)
-      document.getElementById("connect").addEventListener("click", async () => {
-        try {
-          port = await navigator.serial.requestPort();
-          await port.open({ baudRate: 9600 });
-          writer = port.writable.getWriter();
-          console.log("Serial Port Connected");
-        } catch (error) {
-          console.error("Serial Port Connection Error:", error);
-        }
-      });
-    }
-
-    function draw() {
-      // Always draw camera feed in the canvas
-      image(video, 0, 0, width, height);
-
-      // If we have at least one hand detected
-      if (predictions.length > 0) {
-        let hand = predictions[0].landmarks;
-        let gesture = detectGesture(hand);
-
-        // Draw gesture label
-        fill(255, 0, 0);
-        textSize(32);
-        text("Gesture: " + gesture, 10, height - 10);
-
-        // If gesture changes, send serial data once
-        if (gesture && gesture !== currentGesture) {
-          currentGesture = gesture;
-          sendSerial(gesture);
+          // 카메라 OFF 상태 표시
+          fill(0);
+          textSize(24);
+          textAlign(CENTER, CENTER);
+          text("Camera is off", width / 2, height / 2);
         }
 
-        // Draw keypoints
-        drawKeypoints(hand);
-      }
-    }
+        // 제스처 인식 후, 결과 ASCII 박스에 표시
+        if (predictions.length > 0) {
+          let hand = predictions[0].landmarks;
+          let gesture = detectGesture(hand);
+          document.getElementById("gestureAscii").textContent = formatAsciiGesture(gesture);
 
-    // Draw circles on each landmark
-    function drawKeypoints(landmarks) {
-      for (let i = 0; i < landmarks.length; i++) {
-        let x = landmarks[i][0], y = landmarks[i][1];
-        fill(0, 255, 0);
-        noStroke();
-        ellipse(x, y, 8, 8);
-      }
-    }
+          // 새로운 제스처가 감지될 때마다 시리얼로 전송
+          if (gesture && gesture !== currentGesture) {
+            currentGesture = gesture;
+            sendSerial(gesture);
+          }
+        }
+      };
 
-    // Simple gesture detection logic for the right hand
-    // 1 = left, 2 = right, 3 = up, 4 = down, 5 = open, 6 = fist
-    function detectGesture(landmarks) {
-      let d_index  = dist(landmarks[0][0], landmarks[0][1], landmarks[8][0], landmarks[8][1]);
-      let d_middle = dist(landmarks[0][0], landmarks[0][1], landmarks[12][0], landmarks[12][1]);
-      let d_ring   = dist(landmarks[0][0], landmarks[0][1], landmarks[16][0], landmarks[16][1]);
-      let d_pinky  = dist(landmarks[0][0], landmarks[0][1], landmarks[20][0], landmarks[20][1]);
-      let avgOther = (d_middle + d_ring + d_pinky) / 3;
-
-      let xs = landmarks.map(p => p[0]);
-      let ys = landmarks.map(p => p[1]);
-      let handSize = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-      let avgDistance = (d_index + d_middle + d_ring + d_pinky) / 4;
-
-      // If index finger extended more than others
-      if (d_index > avgOther * 1.2) {
-        let dx = landmarks[8][0] - landmarks[5][0];
-        let dy = landmarks[8][1] - landmarks[5][1];
-        if (Math.abs(dx) > Math.abs(dy)) {
-          return (dx < 0) ? "1" : "2";
-        } else {
-          return (dy < 0) ? "3" : "4";
+      // 캔버스 상에 손의 관절들을 표시 (반전 좌표계를 그대로 사용)
+      function drawKeypoints(landmarks) {
+        for (let i = 0; i < landmarks.length; i++) {
+          let x = landmarks[i][0];
+          let y = landmarks[i][1];
+          fill(255, 255, 255);
+          noStroke();
+          ellipse(x, y, 8, 8);
         }
       }
-      // If average distance is large => open hand
-      if (avgDistance > handSize * 0.6) { return "5"; }
-      // If average distance is small => fist
-      if (avgDistance < handSize * 0.3) { return "6"; }
-      return "";
-    }
 
-    async function sendSerial(command) {
-      if (writer) {
-        try {
-          const data = new TextEncoder().encode(command);
-          await writer.write(data);
-          console.log("Command Sent: " + command);
-        } catch (error) {
-          console.error("Serial Send Error:", error);
+      // 간단한 제스처 감지 로직 (오른손 기준)
+      function detectGesture(landmarks) {
+        let d_index  = dist(landmarks[0][0], landmarks[0][1], landmarks[8][0], landmarks[8][1]);
+        let d_middle = dist(landmarks[0][0], landmarks[0][1], landmarks[12][0], landmarks[12][1]);
+        let d_ring   = dist(landmarks[0][0], landmarks[0][1], landmarks[16][0], landmarks[16][1]);
+        let d_pinky  = dist(landmarks[0][0], landmarks[0][1], landmarks[20][0], landmarks[20][1]);
+        let avgOther = (d_middle + d_ring + d_pinky) / 3;
+        let xs = landmarks.map(p => p[0]);
+        let ys = landmarks.map(p => p[1]);
+        let handSize = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+        let avgDistance = (d_index + d_middle + d_ring + d_pinky) / 4;
+        if (d_index > avgOther * 1.2) {
+          let dx = landmarks[8][0] - landmarks[5][0];
+          let dy = landmarks[8][1] - landmarks[5][1];
+          if (Math.abs(dx) > Math.abs(dy)) {
+            return (dx < 0) ? "1" : "2";
+          } else {
+            return (dy < 0) ? "3" : "4";
+          }
+        }
+        if (avgDistance > handSize * 0.6) { return "5"; }
+        if (avgDistance < handSize * 0.3) { return "6"; }
+        return "";
+      }
+
+      // 제스처 결과를 ASCII 스타일 박스로 포맷하는 함수
+      function formatAsciiGesture(gesture) {
+        if (!gesture) return "";
+        const line = "+-------------+";
+        const content = "| Gesture: " + gesture + " |";
+        return line + "\n" + content + "\n" + line;
+      }
+
+      // 시리얼 통신을 통해 명령 전송
+      async function sendSerial(command) {
+        if (writer) {
+          try {
+            const data = new TextEncoder().encode(command);
+            await writer.write(data);
+            console.log("Command Sent: " + command);
+          } catch (error) {
+            console.error("Serial Send Error:", error);
+          }
         }
       }
-    }
+    });
   </script>
 </body>
 </html>
