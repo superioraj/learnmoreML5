@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Learnmore AI Education Style</title>
   <style>
-    /* Overall page styling using a monospaced (ASCII) font */
+    /* 전체 페이지 스타일: 모노스페이스(ASCII) 폰트 사용 */
     body {
       margin: 0;
       font-family: "Courier New", Courier, monospace;
@@ -12,7 +12,7 @@
       color: #333;
       text-align: center;
     }
-    /* Navigation bar styling */
+    /* 네비게이션 바 스타일 */
     .navbar {
       background-color: #000;
       height: 60px;
@@ -37,21 +37,27 @@
     .navbar a:hover {
       text-decoration: underline;
     }
-    /* ASCII art container styling */
+    /* ASCII 아트 컨테이너 */
     #ascii-art {
       margin: 50px auto;
       padding: 20px;
-      border: 1px solid #B3B3B3; /* 70% gray border */
+      border: 1px solid #B3B3B3; /* 약 70% 회색 */
       display: inline-block;
       white-space: pre;
-      font-size: 24px;
+      font-size: 18px;
+      line-height: 1.2;
       cursor: pointer;
       transition: all 0.3s ease;
+    }
+    /* 상단, 하단에 임의 테두리(옵션) */
+    .ascii-border {
+      font-size: 14px;
+      color: #999;
     }
   </style>
 </head>
 <body>
-  <!-- Navigation bar with clickable menu items -->
+  <!-- 네비게이션 바 -->
   <div class="navbar">
     <ul>
       <li><a href="index.html">Index</a></li>
@@ -61,43 +67,103 @@
     </ul>
   </div>
   
-  <!-- Creative ASCII artwork with interactive glitch effect -->
-  <div id="ascii-art">
-### Learnmore AI Education Stlye ###
+  <!-- 상단 ASCII 테두리 (옵션) -->
+  <div class="ascii-border">
+    +----------------------------------------------------------+
+  </div>
+  
+  <!-- 글리치 효과를 위한 ASCII 아트 -->
+  <div id="ascii-art"></div>
+  
+  <!-- 하단 ASCII 테두리 (옵션) -->
+  <div class="ascii-border">
+    +----------------------------------------------------------+
   </div>
 
   <script>
-    // JavaScript for interactive ASCII art glitch effect and hyperlink on click
+    /*****************************************************************
+     * 1) 원본 ASCII 아트 문자열
+     *    - DXEEXOWE 부분을 "AI WITH YOU"로 교체
+     *    - 마지막에 \n 추가하여 하단 줄바꿈이 반영되도록 함
+     *****************************************************************/
+    const originalText = `
++------------------------------------------------------------------+
+|  ####   ##  ##  ######  ######   ##  ##  ####   ##   ##  ######  |
+|  ##  ##  ## ##  ##      ##       ## ##  ##  ##  ##   ##  ##      |
+|  ##  ##   ###   ####    ####      ###   ##  ##  ## # ##  ####    |
+|  ##  ##  ## ##  ##      ##       ## ##  ##  ##  #######  ##      |
+|  ####   ##  ##  ######  ######  ##   ##  ####   ##   ##  ######  |
+|                                                                  |
+|     L E A R N M O R E   A I   E D U C A T I O N   S T Y L E      |
+|               Create by Hongsoon.Kim & Minju.Kim                 |
++------------------------------------------------------------------+
+
+`; // 하단 줄바꿈 포함
+
+    // ASCII 아트 컨테이너
     const asciiArtElement = document.getElementById("ascii-art");
-    const originalText = asciiArtElement.textContent;
-    let glitchInterval;
-    
-    // When mouse hovers over the ASCII art, start glitch effect
-    asciiArtElement.addEventListener("mouseenter", function() {
-      glitchInterval = setInterval(() => {
-        let newText = "";
-        for (let i = 0; i < originalText.length; i++) {
-          // Preserve spaces and newlines
-          if (originalText[i] === " " || originalText[i] === "\n") {
-            newText += originalText[i];
+    asciiArtElement.textContent = originalText;
+
+    // 글리치 관련 변수
+    let glitchInterval = null;
+    let currentIntervalID = null;
+
+    /*****************************************************************
+     * 2) "느린 글리치" & "빠른 글리치"
+     *    - 마우스 미호버 시 느린 글리치
+     *    - 마우스 호버 시 빠른 글리치
+     *****************************************************************/
+    let baseInterval = 400;        // 기본(느린) 글리치 주기 (ms)
+    let hoverInterval = 80;        // 호버 시(빠른) 글리치 주기 (ms)
+    let baseGlitchChance = 0.05;   // 느린 글리치 확률
+    let hoverGlitchChance = 0.3;   // 빠른 글리치 확률
+
+    // 글리치 텍스트 생성 함수
+    function glitchText(chance) {
+      let newText = "";
+      for (let i = 0; i < originalText.length; i++) {
+        const ch = originalText[i];
+        // 공백, 줄바꿈 등은 그대로 유지
+        if (ch === " " || ch === "\n") {
+          newText += ch;
+        } else {
+          // chance 확률로 임의 문자로 치환
+          if (Math.random() < chance) {
+            // 33('!') ~ 126('~') 범위
+            newText += String.fromCharCode(33 + Math.floor(Math.random() * 94));
           } else {
-            // 50% chance to change the character to a random ASCII symbol
-            newText += (Math.random() < 0.5) 
-              ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) 
-              : originalText[i];
+            newText += ch;
           }
         }
-        asciiArtElement.textContent = newText;
-      }, 50);
+      }
+      asciiArtElement.textContent = newText;
+    }
+
+    // 글리치 주기를 재설정하는 함수
+    function setGlitchInterval(intervalTime, glitchChance) {
+      if (currentIntervalID) {
+        clearInterval(currentIntervalID);
+      }
+      currentIntervalID = setInterval(() => {
+        glitchText(glitchChance);
+      }, intervalTime);
+    }
+
+    // 초기에는 "느린 글리치"로 시작
+    setGlitchInterval(baseInterval, baseGlitchChance);
+
+    // 마우스가 아트 위로 올라갈 때 → 빠른 글리치
+    asciiArtElement.addEventListener("mouseenter", () => {
+      setGlitchInterval(hoverInterval, hoverGlitchChance);
     });
-    
-    // When the mouse leaves, stop glitch effect and reset the text
-    asciiArtElement.addEventListener("mouseleave", function() {
-      clearInterval(glitchInterval);
+
+    // 마우스가 벗어날 때 → 원본 복원 후, 느린 글리치 재개
+    asciiArtElement.addEventListener("mouseleave", () => {
       asciiArtElement.textContent = originalText;
+      setGlitchInterval(baseInterval, baseGlitchChance);
     });
-    
-    // On click, navigate to www.learnmore.co.kr
+
+    // 클릭 시 특정 링크 이동
     asciiArtElement.addEventListener("click", function() {
       window.location.href = "https://www.learnmore.co.kr";
     });
