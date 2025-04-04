@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>FaceMesh Control Example</title>
-  <!-- Load p5.js and ml5.js libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+  <!-- p5.js와 ml5.js 라이브러리를 jsDelivr CDN을 통해 불러옵니다. -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
   <style>
-    /* Overall page styling using a monospaced (ASCII) font */
+    /* 전체 페이지 스타일: 모노스페이스 폰트 사용 */
     body {
       margin: 0;
       font-family: "Courier New", Courier, monospace;
@@ -15,7 +15,7 @@
       color: #333;
       text-align: center;
     }
-    /* Navigation bar with Gates Notes style */
+    /* 네비게이션 바 (Gates Notes 스타일) */
     .navbar {
       background-color: #000;
       display: flex;
@@ -36,16 +36,16 @@
     .menu-item {
       text-decoration: none;
       font-size: 18px;
-      color: #ccc; /* inactive */
+      color: #ccc;
       transition: color 0.3s ease;
     }
     .menu-item.active {
-      color: #fff; /* active */
+      color: #fff;
     }
     .menu-item:hover {
       color: #eee;
     }
-    /* Optional typewriter effect container */
+    /* 상단 타자기 효과 컨테이너 */
     .typewriter-container {
       margin: 40px auto 20px auto;
       max-width: 700px;
@@ -68,14 +68,14 @@
       50% { opacity: 0; }
       100% { opacity: 1; }
     }
-    /* p5.js canvas container */
+    /* p5.js 캔버스 컨테이너 */
     #p5-canvas-container {
       margin: 0 auto 30px auto;
       width: 640px;
       position: relative;
       border: 1px solid #B3B3B3;
     }
-    /* FaceMesh data display with ASCII glitch effect */
+    /* FaceMesh 데이터 디스플레이 (ASCII glitch 효과) */
     #faceData {
       margin: 20px auto;
       padding: 10px;
@@ -84,7 +84,7 @@
       display: inline-block;
       white-space: pre;
     }
-    /* Serial connection button */
+    /* 시리얼 연결 버튼 */
     #connect {
       margin: 15px;
       padding: 8px 16px;
@@ -96,7 +96,7 @@
   </style>
 </head>
 <body>
-  <!-- Navigation bar -->
+  <!-- 네비게이션 바 -->
   <div class="navbar">
     <ul>
       <li><a href="index.html" class="menu-item">Index</a></li>
@@ -106,25 +106,25 @@
     </ul>
   </div>
   
-  <!-- Optional typewriter container -->
+  <!-- 상단 타자기 컨테이너 -->
   <div id="typewriter" class="typewriter-container"></div>
   
-  <!-- p5.js canvas container (camera feed appears immediately) -->
+  <!-- p5.js 캔버스 컨테이너 (카메라 피드가 여기서 표시됩니다.) -->
   <div id="p5-canvas-container"></div>
   
-  <!-- FaceMesh data display -->
+  <!-- FaceMesh 데이터 디스플레이 -->
   <div id="faceData">Face Data: N/A</div>
   
-  <!-- Serial connection button -->
+  <!-- 시리얼 연결 버튼 -->
   <button id="connect">Connect Serial</button>
   
   <script>
     /*******************************************************
-     * 1) ASCII Typewriter Effect (Optional)
+     * 1) ASCII 타자기 효과 (Optional)
      *******************************************************/
     const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
-    const typeSpeed = 50; // 50ms per character
-    const loopDelay = 2000; // 2 seconds delay before repeating
+    const typeSpeed = 50;    // 문자당 50ms
+    const loopDelay = 2000;  // 반복 전 2초 지연
     function startTypewriter() {
       const container = document.getElementById("typewriter");
       let idx = 0;
@@ -134,7 +134,11 @@
           idx++;
           setTimeout(typeChar, typeSpeed);
         } else {
-          setTimeout(() => { container.textContent = ""; idx = 0; typeChar(); }, loopDelay);
+          setTimeout(() => {
+            container.textContent = "";
+            idx = 0;
+            typeChar();
+          }, loopDelay);
         }
       }
       typeChar();
@@ -142,28 +146,27 @@
     document.addEventListener("DOMContentLoaded", () => { startTypewriter(); });
     
     /*******************************************************
-     * 2) FaceMesh + Web Serial API for micro:bit Control
+     * 2) FaceMesh + Web Serial API를 이용한 micro:bit 제어
      *******************************************************/
     let video, facemesh, predictions = [];
     let port, writer;
     let prevX = 0, prevY = 0, prevMouth = 0;
     
+    // p5.js setup 함수 (글로벌 함수로 선언)
     function setup() {
-      // Initialize p5 canvas and immediately start camera capture,
-      // so that the camera feed is visible even if serial is not connected.
       let cnv = createCanvas(640, 480);
       cnv.parent('p5-canvas-container');
       
-      // Create and display camera capture (mirror effect applied in draw())
+      // 카메라 캡처: p5.js에서 생성된 캔버스에 표시하기 위해 video.hide()를 사용합니다.
       video = createCapture(VIDEO);
       video.size(width, height);
       video.hide();
       
-      // Initialize FaceMesh model
+      // FaceMesh 모델 초기화
       facemesh = ml5.facemesh(video, modelReady);
       facemesh.on('predict', results => { predictions = results; });
       
-      // Serial connection (optional) activated via button click
+      // 시리얼 연결 버튼 이벤트 (옵션)
       document.getElementById("connect").addEventListener("click", async () => {
         try {
           port = await navigator.serial.requestPort();
@@ -180,77 +183,82 @@
       console.log("FaceMesh Model Loaded");
     }
     
+    // p5.js draw 함수: 매 프레임 호출됩니다.
     function draw() {
-      // Draw flipped video for mirror effect
+      background(220);
+      
+      // 영상과 랜드마크 모두 동일한 좌우 반전 변환 적용 (mirror effect)
       push();
       translate(width, 0);
       scale(-1, 1);
       image(video, 0, 0, width, height);
-      pop();
       
-      // Draw center crosshair (gray 60%: #999999)
+      // 중심 십자선 (디버깅용)
       stroke('#999999');
       strokeWeight(2);
       line(width/2 - 25, height/2, width/2 + 25, height/2);
       line(width/2, height/2 - 25, width/2, height/2 + 25);
       
+      // FaceMesh 예측 결과가 있을 경우, 랜드마크를 그립니다.
       if (predictions.length > 0) {
         let face = predictions[0].scaledMesh;
-        // Compute bounding box for horizontal mapping
+        for (let i = 0; i < face.length; i++) {
+          let [x, y] = face[i];
+          fill(150, 150, 150); // SlateGray 색상
+          noStroke();
+          ellipse(x, y, 4, 4);
+        }
+      }
+      pop();
+      
+      // FaceMesh 데이터를 이용해 수치 정보를 계산하고, 업데이트합니다.
+      if (predictions.length > 0) {
+        let face = predictions[0].scaledMesh;
         let xs = face.map(p => p[0]);
         let minX = Math.min(...xs), maxX = Math.max(...xs);
         
-        // Using landmarks: forehead (index 10), chin (index 152), and nose tip (index 4)
+        // 예시: 이마 (인덱스 10), 턱 (인덱스 152), 코끝 (인덱스 4) 사용
         let forehead = face[10];
         let chin = face[152];
         let nose = face[4];
         let faceHeight = chin[1] - forehead[1];
-        // Vertical: if nose is near forehead => looking up → high value.
         let verticalRatio = (nose[1] - forehead[1]) / faceHeight;
         let yValue = Math.round((1 - verticalRatio) * 100);
         yValue = constrain(yValue, 1, 100);
         
-        // Horizontal: using flipped x-coordinate from bounding box (nose position)
+        // 수평 위치: 코 위치와 경계값 사용 (원본 좌표 기준)
         let horizontalRatio = (maxX - nose[0]) / (maxX - minX);
         let xValue = Math.round(horizontalRatio * 100);
         xValue = constrain(xValue, 1, 100);
         
-        // Mouth: distance between inner lip landmarks (indices 13 and 14)
+        // 입술 내부 (인덱스 13, 14) 사이 거리로 입 모양 판단
         let mouthUpper = face[13];
         let mouthLower = face[14];
         let mouthDist = dist(mouthUpper[0], mouthUpper[1], mouthLower[0], mouthLower[1]);
-        // Normalize by face height and scale empirically
         let mouthValue = Math.round((mouthDist / faceHeight) * 300);
         mouthValue = constrain(mouthValue, 1, 100);
         
-        // Update Face Data display with ASCII glitch effect if values change
+        // Face Data 디스플레이 업데이트 (ASCII glitch 효과 적용)
         let faceDataDiv = document.getElementById("faceData");
         if (xValue !== prevX || yValue !== prevY || mouthValue !== prevMouth) {
           let glitchText = generateGlitchText(xValue, yValue, mouthValue);
           faceDataDiv.textContent = glitchText;
           prevX = xValue; prevY = yValue; prevMouth = mouthValue;
-          // Serial data in format "X:<xValue>;Y:<yValue>;M:<mouthValue>"
+          // 시리얼 전송 형식: "X:<xValue>;Y:<yValue>;M:<mouthValue>"
           let command = "X:" + xValue + ";Y:" + yValue + ";M:" + mouthValue;
           sendSerial(command);
-        }
-        
-        // Optionally, draw face landmarks (for debugging)
-        for (let i = 0; i < face.length; i++) {
-          let [x, y] = face[i];
-          fill(0, 255, 0);
-          noStroke();
-          ellipse(width - x, y, 4, 4);
         }
       }
     }
     
+    // ASCII glitch 텍스트 생성 함수
     function generateGlitchText(xVal, yVal, mouthVal) {
       let asciiChars = "!@#$%^&*()-_=+[]{};:'\",.<>/?\\|";
       function glitchNumber(num) {
         let str = num.toString();
         let glitched = "";
         for (let i = 0; i < str.length; i++) {
-          glitched += (Math.random() < 0.5)
+          glitched += (Math.random() < 0.15) // 15% 확률로 글리치
             ? asciiChars.charAt(Math.floor(Math.random() * asciiChars.length))
             : str.charAt(i);
         }
@@ -259,6 +267,7 @@
       return "X:" + glitchNumber(xVal) + "  Y:" + glitchNumber(yVal) + "\nMOUTH:" + glitchNumber(mouthVal);
     }
     
+    // 시리얼 통신으로 명령 전송 (비동기 함수)
     async function sendSerial(command) {
       if (writer) {
         try {
