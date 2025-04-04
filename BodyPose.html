@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>BodyPose Control Example</title>
-  <!-- Load p5.js and ml5.js libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+  <!-- p5.js와 ml5.js 라이브러리를 jsDelivr CDN을 통해 불러옵니다. -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
   <style>
-    /* Overall page styling using a monospaced (ASCII) font */
+    /* 전체 페이지 스타일: 모노스페이스 폰트 사용 */
     body {
       margin: 0;
       font-family: "Courier New", Courier, monospace;
@@ -15,7 +15,7 @@
       color: #333;
       text-align: center;
     }
-    /* Navigation bar (Gates Notes style) */
+    /* 네비게이션 바 (Gates Notes 스타일) */
     .navbar {
       background-color: #000;
       display: flex;
@@ -36,16 +36,16 @@
     .menu-item {
       text-decoration: none;
       font-size: 18px;
-      color: #ccc;  /* Inactive link */
+      color: #ccc;
       transition: color 0.3s ease;
     }
     .menu-item.active {
-      color: #fff;  /* Active link */
+      color: #fff;
     }
     .menu-item:hover {
       color: #eee;
     }
-    /* Typewriter effect container (optional) */
+    /* ASCII 타자기 효과 컨테이너 (선택사항) */
     .typewriter-container {
       margin: 40px auto 20px auto;
       max-width: 700px;
@@ -68,7 +68,7 @@
       50% { opacity: 0; }
       100% { opacity: 1; }
     }
-    /* Table styling: horizontal borders only */
+    /* 테이블 스타일 (수평 테두리만) */
     table {
       margin: 20px auto;
       border-collapse: collapse;
@@ -84,8 +84,8 @@
     th {
       background-color: #f2f2f2;
     }
-    /* Serial connection button */
-    #connect {
+    /* 버튼 스타일 */
+    #connect, #cameraOn, #cameraOff {
       margin: 15px;
       padding: 8px 16px;
       font-size: 16px;
@@ -93,26 +93,26 @@
       border: 1px solid #B3B3B3;
       background-color: #fff;
     }
-    /* p5.js canvas container */
+    /* p5.js 캔버스 컨테이너 */
     #p5-canvas-container {
       margin: 0 auto 30px auto;
       width: 640px;
       position: relative;
       border: 1px solid #B3B3B3;
     }
-    /* Gesture text label */
-    .gesture-label {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      color: red;
-      font-size: 24px;
-      pointer-events: none;
+    /* ASCII 스타일 제스처 박스 (화면 하단) */
+    #gestureAscii {
+      margin: 20px auto;
+      max-width: 300px;
+      border: 1px dotted #B3B3B3;
+      padding: 20px;
+      white-space: pre;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <!-- Navigation bar with menu items -->
+  <!-- 네비게이션 바 -->
   <div class="navbar">
     <ul>
       <li><a href="index.html" class="menu-item">Index</a></li>
@@ -122,10 +122,10 @@
     </ul>
   </div>
 
-  <!-- Optional ASCII Typewriter effect container -->
+  <!-- ASCII 타자기 효과 컨테이너 (선택사항) -->
   <div id="typewriter" class="typewriter-container"></div>
 
-  <!-- Updated Gesture Mapping Table for BodyPose -->
+  <!-- 바디 포즈 제스처 매핑 테이블 -->
   <table>
     <thead>
       <tr>
@@ -161,19 +161,24 @@
     </tbody>
   </table>
 
-  <!-- Serial connection button -->
+  <!-- 시리얼 연결 버튼 및 카메라 제어 버튼 -->
   <button id="connect">Connect Serial</button>
+  <button id="cameraOn">Camera On</button>
+  <button id="cameraOff">Camera Off</button>
 
-  <!-- p5.js canvas container -->
+  <!-- p5.js 캔버스 컨테이너 -->
   <div id="p5-canvas-container"></div>
+
+  <!-- 제스처 결과 ASCII 박스 -->
+  <div id="gestureAscii"></div>
 
   <script>
     /************************************************************
-     * 1) ASCII Typewriter Effect (Looping) - (Optional)
+     * 1) ASCII 타자기 효과 (루핑) - (선택사항)
      ************************************************************/
     const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
-    const typeSpeed = 50;
-    const loopDelay = 2000;
+    const typeSpeed = 50;    // 문자당 50ms
+    const loopDelay = 2000;  // 반복 전 2초 지연
     function startTypewriter() {
       const container = document.getElementById("typewriter");
       let idx = 0;
@@ -195,31 +200,37 @@
     document.addEventListener("DOMContentLoaded", startTypewriter);
 
     /************************************************************
-     * 2) BodyPose (PoseNet) + Web Serial API for micro:bit Control
+     * 2) BodyPose (PoseNet) + Web Serial API를 이용한 micro:bit 제어
      ************************************************************/
     let video, poseNet;
     let pose = null;
+    let skeleton = null; // PoseNet skeleton 정보
     let prevRightWrist = null;
     let prevLeftWrist = null;
     let port, writer;
     let currentGesture = "";
+    let cameraActive = true;
 
+    // p5.js setup 함수: 캔버스 생성, 비디오 캡처 및 PoseNet 초기화
     function setup() {
       let cnv = createCanvas(640, 480);
       cnv.parent('p5-canvas-container');
+
       video = createCapture(VIDEO);
       video.size(width, height);
       video.hide();
 
-      // Initialize PoseNet (BodyPose) model
+      // PoseNet 초기화 및 결과 업데이트
       poseNet = ml5.poseNet(video, modelReady);
+      // poseNet.on('pose', callback) => callback(results), results[i].pose, results[i].skeleton
       poseNet.on('pose', results => {
         if (results.length > 0) {
           pose = results[0].pose;
+          skeleton = results[0].skeleton;  // 각 관절 쌍 정보
         }
       });
 
-      // Serial port connection
+      // 시리얼 연결 버튼 이벤트
       document.getElementById("connect").addEventListener("click", async () => {
         try {
           port = await navigator.serial.requestPort();
@@ -230,6 +241,35 @@
           console.error("Serial Port Connection Error:", error);
         }
       });
+
+      // Camera On 버튼 이벤트
+      document.getElementById("cameraOn").addEventListener("click", () => {
+        if (!cameraActive) {
+          if (video) { video.remove(); }
+          // 재초기화: 새 비디오 캡처 생성 및 PoseNet 재설정
+          video = createCapture(VIDEO);
+          video.size(width, height);
+          video.hide();
+          poseNet = ml5.poseNet(video, modelReady);
+          poseNet.on('pose', results => {
+            if (results.length > 0) {
+              pose = results[0].pose;
+              skeleton = results[0].skeleton;
+            }
+          });
+          cameraActive = true;
+          console.log("Camera turned ON");
+        }
+      });
+
+      // Camera Off 버튼 이벤트
+      document.getElementById("cameraOff").addEventListener("click", () => {
+        if (cameraActive && video && video.elt && video.elt.srcObject) {
+          video.elt.srcObject.getTracks().forEach(track => track.stop());
+          cameraActive = false;
+          console.log("Camera turned OFF");
+        }
+      });
     }
 
     function modelReady() {
@@ -237,93 +277,139 @@
     }
 
     function draw() {
-      image(video, 0, 0, width, height);
+      background(220);
+      // 카메라 활성 상태에 따라 영상 출력 또는 메시지 표시
+      if (cameraActive && video) {
+        // 영상 및 캔버스 모두 좌우 반전 (mirror effect)
+        push();
+        translate(width, 0);
+        scale(-1, 1);
+        image(video, 0, 0, width, height);
 
+        // 포즈가 감지되었다면 랜드마크(점)와 관절(선)을 그림
+        if (pose && skeleton) {
+          drawKeypointsAndSkeleton(pose, skeleton);
+        }
+        pop();
+      } else {
+        fill(0);
+        textSize(24);
+        textAlign(CENTER, CENTER);
+        text("Camera is off", width / 2, height / 2);
+      }
+
+      // 포즈 감지 및 제스처 처리
       if (pose) {
         let gesture = detectGesture(pose);
-        fill(255, 0, 0);
-        textSize(32);
-        text("Gesture: " + gesture, 10, height - 10);
+        // ASCII 박스에 표시
+        document.getElementById("gestureAscii").textContent = formatAsciiGesture(gesture);
 
+        // 새 제스처가 감지되면 시리얼 전송
         if (gesture && gesture !== currentGesture) {
           currentGesture = gesture;
           sendSerial(gesture);
         }
-      }
 
-      // Update previous wrist positions for movement detection
-      if (pose) {
-        prevRightWrist = getPart(pose, "rightWrist");
-        prevLeftWrist = getPart(pose, "leftWrist");
+        // 이전 손목 위치 업데이트 (움직임 감지용)
+        prevRightWrist = getMirroredPart(pose, "rightWrist");
+        prevLeftWrist = getMirroredPart(pose, "leftWrist");
       }
     }
 
-    // Helper: get position of a specific body part from pose keypoints
-    function getPart(pose, part) {
+    // (A) 랜드마크와 스켈레톤(선)을 그리는 함수
+    function drawKeypointsAndSkeleton(pose, skeleton) {
+      // 1. 랜드마크(점) 그리기
+      for (let i = 0; i < pose.keypoints.length; i++) {
+        const kp = pose.keypoints[i];
+        // Mirror 좌표 변환 (이미 push/scale(-1,1)된 상태이므로 직접 변환 불필요)
+        let x = kp.position.x;
+        let y = kp.position.y;
+
+        fill(255);         // 흰색
+        noStroke();
+        ellipse(x, y, 8, 8); // 반경 4px => 지름 8px
+      }
+
+      // 2. 관절(선) 그리기
+      stroke(255);         // 흰색
+      strokeWeight(2);     // 얇은 선
+      for (let i = 0; i < skeleton.length; i++) {
+        let partA = skeleton[i][0];
+        let partB = skeleton[i][1];
+        // Mirror 좌표 변환 (이미 push/scale(-1,1)된 상태이므로 직접 변환 불필요)
+        let xA = partA.position.x;
+        let yA = partA.position.y;
+        let xB = partB.position.x;
+        let yB = partB.position.y;
+        line(xA, yA, xB, yB);
+      }
+    }
+
+    // (B) 좌우 반전 좌표로 특정 부위 가져오기 (제스처 감지용)
+    function getMirroredPart(pose, part) {
       let kp = pose.keypoints.find(k => k.part === part);
-      return kp ? kp.position : null;
+      if (!kp) return null;
+      // 실제 x 좌표를 width - kp.position.x로 변환
+      // (draw()에서 mirror transform을 했으므로, 제스처 계산도 동일 기준)
+      return { x: width - kp.position.x, y: kp.position.y };
     }
 
-    // Calculate Euclidean distance between two points
-    function distance(p1, p2) {
-      return dist(p1.x, p1.y, p2.x, p2.y);
-    }
-
-    // Detect gesture based on the current body pose
+    // (C) 포즈 기반 제스처 감지 함수 (좌우 반전된 좌표 사용)
     function detectGesture(pose) {
-      // Extract relevant keypoint positions
-      const nose = getPart(pose, "nose");
-      const leftWrist = getPart(pose, "leftWrist");
-      const rightWrist = getPart(pose, "rightWrist");
-      const leftShoulder = getPart(pose, "leftShoulder");
-      const rightShoulder = getPart(pose, "rightShoulder");
-      const leftHip = getPart(pose, "leftHip");
-      const rightHip = getPart(pose, "rightHip");
-      const leftKnee = getPart(pose, "leftKnee");
-      const rightKnee = getPart(pose, "rightKnee");
-      const leftAnkle = getPart(pose, "leftAnkle");
-      const rightAnkle = getPart(pose, "rightAnkle");
+      const nose = getMirroredPart(pose, "nose");
+      const leftWrist = getMirroredPart(pose, "leftWrist");
+      const rightWrist = getMirroredPart(pose, "rightWrist");
+      const leftShoulder = getMirroredPart(pose, "leftShoulder");
+      const rightShoulder = getMirroredPart(pose, "rightShoulder");
+      const leftHip = getMirroredPart(pose, "leftHip");
+      const rightHip = getMirroredPart(pose, "rightHip");
+      const leftAnkle = getMirroredPart(pose, "leftAnkle");
+      const rightAnkle = getMirroredPart(pose, "rightAnkle");
 
-      // 1. Celebration (Manse): both wrists above nose
+      // 1. Celebration (Manse): 양쪽 손목이 코 위에 있을 때
       if (leftWrist && rightWrist && nose) {
         if (leftWrist.y < nose.y && rightWrist.y < nose.y) {
           return "3";
         }
       }
-
-      // 2. Arms Spread: both wrists far left/right of shoulders
+      // 2. Arms Spread: 양쪽 손목이 어깨 좌우로 충분히 떨어져 있을 때
       if (leftWrist && rightWrist && leftShoulder && rightShoulder) {
         if (leftWrist.x < leftShoulder.x - 20 && rightWrist.x > rightShoulder.x + 20) {
           return "4";
         }
       }
-
-      // 3. Arm Moving: check movement of right or left wrist relative to previous positions
+      // 3. Arm Moving: 이전 위치와의 차이가 큰 경우 (오른손 또는 왼손 움직임)
       const movementThreshold = 20;
       let rightDelta = 0, leftDelta = 0;
       if (prevRightWrist && rightWrist) {
-        rightDelta = distance(rightWrist, prevRightWrist);
+        rightDelta = dist(rightWrist.x, rightWrist.y, prevRightWrist.x, prevRightWrist.y);
       }
       if (prevLeftWrist && leftWrist) {
-        leftDelta = distance(leftWrist, prevLeftWrist);
+        leftDelta = dist(leftWrist.x, leftWrist.y, prevLeftWrist.x, prevLeftWrist.y);
       }
       if (rightDelta > movementThreshold || leftDelta > movementThreshold) {
         if (rightDelta >= leftDelta && rightDelta > movementThreshold) return "5";
         if (leftDelta > rightDelta && leftDelta > movementThreshold) return "6";
       }
-
-      // 4. Standing vs Sitting: compare average hip and ankle positions
+      // 4. Standing vs Sitting: 평균 엉덩이와 발목 위치 비교
       if (leftHip && rightHip && leftAnkle && rightAnkle) {
         let avgHipY = (leftHip.y + rightHip.y) / 2;
         let avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
         if ((avgAnkleY - avgHipY) > 150) return "1"; // Standing
         else return "2"; // Sitting
       }
-
       return "";
     }
 
-    // Send the command to micro:bit via serial communication
+    // (D) ASCII 스타일 제스처 박스 포맷 함수
+    function formatAsciiGesture(gesture) {
+      if (!gesture) return "";
+      const line = "+-------------+";
+      const content = "| Gesture: " + gesture + " |";
+      return line + "\n" + content + "\n" + line;
+    }
+
+    // (E) 시리얼 통신을 통해 명령 전송 (비동기)
     async function sendSerial(command) {
       if (writer) {
         try {
