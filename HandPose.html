@@ -122,10 +122,10 @@
       <li><a href="FaceMesh.html" class="menu-item">FaceMesh</a></li>
     </ul>
   </div>
-  
+
   <!-- Optional ASCII Typewriter effect container -->
   <div id="typewriter" class="typewriter-container"></div>
-  
+
   <!-- Gesture Mapping Table -->
   <table>
     <thead>
@@ -161,13 +161,13 @@
       </tr>
     </tbody>
   </table>
-  
+
   <!-- Serial connection button -->
   <button id="connect">Connect Serial</button>
-  
+
   <!-- p5.js canvas container -->
   <div id="p5-canvas-container"></div>
-  
+
   <script>
     /************************************************************
      * 1) ASCII Typewriter Effect (Looping) - (Optional)
@@ -175,7 +175,7 @@
     const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
     const typeSpeed = 50;   // 50ms per character
     const loopDelay = 2000; // 2 seconds delay before repeating
-    
+
     function startTypewriter() {
       const container = document.getElementById("typewriter");
       let idx = 0;
@@ -195,25 +195,37 @@
       typeChar();
     }
     document.addEventListener("DOMContentLoaded", startTypewriter);
-    
+
     /************************************************************
      * 2) Handpose + Web Serial API for micro:bit Control
      ************************************************************/
     let video, handpose, predictions = [];
     let port, writer;
     let currentGesture = "";
-    
+
     function setup() {
+      // Create p5 canvas and attach to container
       let cnv = createCanvas(640, 480);
       cnv.parent('p5-canvas-container');
-      
-      video = createCapture(VIDEO);
+
+      // Initialize camera capture
+      video = createCapture(VIDEO, () => {
+        console.log("Camera capture initialized.");
+      });
       video.size(width, height);
-      video.hide();
-      
-      handpose = ml5.handpose(video, modelReady);
-      handpose.on("predict", results => { predictions = results; });
-      
+      video.hide();  // Hide HTML video element, we will draw it on canvas
+
+      // Initialize Handpose model
+      handpose = ml5.handpose(video, () => {
+        console.log("Handpose Model Loaded");
+      });
+
+      // Receive predictions from the model
+      handpose.on("predict", results => {
+        predictions = results;
+      });
+
+      // Setup Serial connect button (optional)
       document.getElementById("connect").addEventListener("click", async () => {
         try {
           port = await navigator.serial.requestPort();
@@ -225,27 +237,33 @@
         }
       });
     }
-    
-    function modelReady() {
-      console.log("Handpose Model Loaded");
-    }
-    
+
     function draw() {
+      // Always draw camera feed in the canvas
       image(video, 0, 0, width, height);
+
+      // If we have at least one hand detected
       if (predictions.length > 0) {
         let hand = predictions[0].landmarks;
         let gesture = detectGesture(hand);
+
+        // Draw gesture label
         fill(255, 0, 0);
         textSize(32);
         text("Gesture: " + gesture, 10, height - 10);
+
+        // If gesture changes, send serial data once
         if (gesture && gesture !== currentGesture) {
           currentGesture = gesture;
           sendSerial(gesture);
         }
+
+        // Draw keypoints
         drawKeypoints(hand);
       }
     }
-    
+
+    // Draw circles on each landmark
     function drawKeypoints(landmarks) {
       for (let i = 0; i < landmarks.length; i++) {
         let x = landmarks[i][0], y = landmarks[i][1];
@@ -254,8 +272,8 @@
         ellipse(x, y, 8, 8);
       }
     }
-    
-    // Simple gesture detection logic for the right hand:
+
+    // Simple gesture detection logic for the right hand
     // 1 = left, 2 = right, 3 = up, 4 = down, 5 = open, 6 = fist
     function detectGesture(landmarks) {
       let d_index  = dist(landmarks[0][0], landmarks[0][1], landmarks[8][0], landmarks[8][1]);
@@ -263,10 +281,13 @@
       let d_ring   = dist(landmarks[0][0], landmarks[0][1], landmarks[16][0], landmarks[16][1]);
       let d_pinky  = dist(landmarks[0][0], landmarks[0][1], landmarks[20][0], landmarks[20][1]);
       let avgOther = (d_middle + d_ring + d_pinky) / 3;
+
       let xs = landmarks.map(p => p[0]);
       let ys = landmarks.map(p => p[1]);
       let handSize = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
       let avgDistance = (d_index + d_middle + d_ring + d_pinky) / 4;
+
+      // If index finger extended more than others
       if (d_index > avgOther * 1.2) {
         let dx = landmarks[8][0] - landmarks[5][0];
         let dy = landmarks[8][1] - landmarks[5][1];
@@ -276,11 +297,13 @@
           return (dy < 0) ? "3" : "4";
         }
       }
+      // If average distance is large => open hand
       if (avgDistance > handSize * 0.6) { return "5"; }
+      // If average distance is small => fist
       if (avgDistance < handSize * 0.3) { return "6"; }
       return "";
     }
-    
+
     async function sendSerial(command) {
       if (writer) {
         try {
