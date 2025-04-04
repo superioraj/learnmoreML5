@@ -15,10 +15,9 @@
       color: #333;
       text-align: center;
     }
-
     /* Navigation bar with Gates Notes style: black background, centered menu */
     .navbar {
-      background-color: #000;         /* Black bar */
+      background-color: #000;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -34,22 +33,20 @@
     .navbar li {
       margin: 0 25px;
     }
-
     /* Menu link styling: text-based color changes only */
     .menu-item {
       text-decoration: none;
       font-size: 18px;
-      color: #ccc;                   /* Inactive link color */
+      color: #ccc; /* Inactive link color */
       transition: color 0.3s ease;
     }
     .menu-item.active {
-      color: #fff;                   /* Active (current page) link color */
+      color: #fff; /* Active link color */
     }
     .menu-item:hover {
-      color: #eee;                   /* Hover effect color */
+      color: #eee; /* Hover effect color */
     }
-
-    /* Typewriter effect container (optional) */
+    /* Optional ASCII Typewriter effect container */
     .typewriter-container {
       margin: 40px auto 20px auto;
       max-width: 700px;
@@ -68,12 +65,11 @@
       animation: blink 1s infinite;
     }
     @keyframes blink {
-      0%   { opacity: 1; }
-      50%  { opacity: 0; }
+      0% { opacity: 1; }
+      50% { opacity: 0; }
       100% { opacity: 1; }
     }
-
-    /* Table styling: horizontal borders only (no left/right borders) */
+    /* Table styling: horizontal borders only */
     table {
       margin: 20px auto;
       border-collapse: collapse;
@@ -84,14 +80,11 @@
     th, td {
       border-top: 1px solid #B3B3B3;
       border-bottom: 1px solid #B3B3B3;
-      border-left: none;
-      border-right: none;
       padding: 10px;
     }
     th {
       background-color: #f2f2f2;
     }
-
     /* Serial connection button */
     #connect {
       margin: 15px;
@@ -101,7 +94,6 @@
       border: 1px solid #B3B3B3;
       background-color: #fff;
     }
-
     /* p5.js canvas container */
     #p5-canvas-container {
       margin: 0 auto 30px auto;
@@ -109,7 +101,6 @@
       position: relative;
       border: 1px solid #B3B3B3;
     }
-
     /* Gesture text label */
     .gesture-label {
       position: absolute;
@@ -122,23 +113,19 @@
   </style>
 </head>
 <body>
-  <!-- Navigation bar (black background, Gates Notes style) -->
+  <!-- Navigation bar -->
   <div class="navbar">
     <ul>
-      <!-- Index page link (inactive) -->
       <li><a href="index.html" class="menu-item">Index</a></li>
-      <!-- HandPose page link (active) -->
       <li><a href="HandPose.html" class="menu-item active">HandPose</a></li>
-      <!-- BodyPose page link (inactive) -->
       <li><a href="BodyPose.html" class="menu-item">BodyPose</a></li>
-      <!-- FaceMesh page link (inactive) -->
       <li><a href="FaceMesh.html" class="menu-item">FaceMesh</a></li>
     </ul>
   </div>
-
+  
   <!-- Optional ASCII Typewriter effect container -->
   <div id="typewriter" class="typewriter-container"></div>
-
+  
   <!-- Gesture Mapping Table -->
   <table>
     <thead>
@@ -174,13 +161,13 @@
       </tr>
     </tbody>
   </table>
-
+  
   <!-- Serial connection button -->
   <button id="connect">Connect Serial</button>
-
+  
   <!-- p5.js canvas container -->
   <div id="p5-canvas-container"></div>
-
+  
   <script>
     /************************************************************
      * 1) ASCII Typewriter Effect (Looping) - (Optional)
@@ -188,18 +175,16 @@
     const asciiArtText = "| L | E | A | R | N | M | O | R | E |";
     const typeSpeed = 50;   // 50ms per character
     const loopDelay = 2000; // 2 seconds delay before repeating
-
+    
     function startTypewriter() {
       const container = document.getElementById("typewriter");
       let idx = 0;
-
       function typeChar() {
         if (idx < asciiArtText.length) {
           container.textContent += asciiArtText.charAt(idx);
           idx++;
           setTimeout(typeChar, typeSpeed);
         } else {
-          // After finishing one round, wait and restart
           setTimeout(() => {
             container.textContent = "";
             idx = 0;
@@ -209,30 +194,26 @@
       }
       typeChar();
     }
-    document.addEventListener("DOMContentLoaded", () => {
-      startTypewriter();
-    });
-
+    document.addEventListener("DOMContentLoaded", startTypewriter);
+    
     /************************************************************
      * 2) Handpose + Web Serial API for micro:bit Control
      ************************************************************/
     let video, handpose, predictions = [];
     let port, writer;
     let currentGesture = "";
-
+    
     function setup() {
       let cnv = createCanvas(640, 480);
       cnv.parent('p5-canvas-container');
-
+      
       video = createCapture(VIDEO);
       video.size(width, height);
       video.hide();
-
+      
       handpose = ml5.handpose(video, modelReady);
-      handpose.on("predict", results => {
-        predictions = results;
-      });
-
+      handpose.on("predict", results => { predictions = results; });
+      
       document.getElementById("connect").addEventListener("click", async () => {
         try {
           port = await navigator.serial.requestPort();
@@ -244,22 +225,19 @@
         }
       });
     }
-
+    
     function modelReady() {
       console.log("Handpose Model Loaded");
     }
-
+    
     function draw() {
       image(video, 0, 0, width, height);
-
       if (predictions.length > 0) {
         let hand = predictions[0].landmarks;
         let gesture = detectGesture(hand);
-
         fill(255, 0, 0);
         textSize(32);
         text("Gesture: " + gesture, 10, height - 10);
-
         if (gesture && gesture !== currentGesture) {
           currentGesture = gesture;
           sendSerial(gesture);
@@ -267,7 +245,7 @@
         drawKeypoints(hand);
       }
     }
-
+    
     function drawKeypoints(landmarks) {
       for (let i = 0; i < landmarks.length; i++) {
         let x = landmarks[i][0], y = landmarks[i][1];
@@ -276,8 +254,8 @@
         ellipse(x, y, 8, 8);
       }
     }
-
-    // Simple gesture detection logic for the right hand
+    
+    // Simple gesture detection logic for the right hand:
     // 1 = left, 2 = right, 3 = up, 4 = down, 5 = open, 6 = fist
     function detectGesture(landmarks) {
       let d_index  = dist(landmarks[0][0], landmarks[0][1], landmarks[8][0], landmarks[8][1]);
@@ -285,13 +263,10 @@
       let d_ring   = dist(landmarks[0][0], landmarks[0][1], landmarks[16][0], landmarks[16][1]);
       let d_pinky  = dist(landmarks[0][0], landmarks[0][1], landmarks[20][0], landmarks[20][1]);
       let avgOther = (d_middle + d_ring + d_pinky) / 3;
-
       let xs = landmarks.map(p => p[0]);
       let ys = landmarks.map(p => p[1]);
       let handSize = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
       let avgDistance = (d_index + d_middle + d_ring + d_pinky) / 4;
-
-      // If index finger is clearly extended more than other fingers
       if (d_index > avgOther * 1.2) {
         let dx = landmarks[8][0] - landmarks[5][0];
         let dy = landmarks[8][1] - landmarks[5][1];
@@ -301,13 +276,11 @@
           return (dy < 0) ? "3" : "4";
         }
       }
-      // If average distance is large => open hand
       if (avgDistance > handSize * 0.6) { return "5"; }
-      // If average distance is small => fist
       if (avgDistance < handSize * 0.3) { return "6"; }
       return "";
     }
-
+    
     async function sendSerial(command) {
       if (writer) {
         try {
